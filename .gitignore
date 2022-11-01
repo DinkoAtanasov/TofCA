@@ -1,0 +1,30 @@
+
+# User-specific stuff
+.idea/*
+
+.Python
+[Bb]in
+[Ii]nclude
+[Ll]ib
+[Ll]ib64
+[Ll]ocal
+[Ss]cripts
+pyvenv.cfg
+.venv
+pip-selfcheck.json
+*.pyc
+__pychache__/
+
+### Backup template
+*.bak
+*.gho
+*.ori
+*.orig
+*.tmp
+
+
+/debug_info.log
+
+### VSCode exclusion
+.vscode/*
+

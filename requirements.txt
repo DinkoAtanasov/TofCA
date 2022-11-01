@@ -1,0 +1,7 @@
+matplotlib>=3.5.1
+numpy>=1.23.1
+pandas>=0.25.3
+PyQt5-Qt5>=5.15.2
+PyQt5>=5.15.7
+pyqtgraph>=0.12.1
+
