@@ -26,12 +26,13 @@ Supported Acquisition data formats
 
 + Python3\.X
 + Qt5 (installed through your python version as PyQt5)
++ pyqtgraph (for visualisation)
 
 Checkout the GitLab repository for dEval using your CERN credentials:
 
 ```bash
 cd /to/your/working/directory/
-git clone ...
+git clone https://github.com/DinkoAtanasov/TofCA
 cd TofCA/
 ```
 
