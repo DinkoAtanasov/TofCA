@@ -169,6 +169,7 @@ class Ui_MainWindow(object):
         self.actionAddExtra = QtWidgets.QAction(MainWindow)
         self.actionAddExtra.setObjectName("actionAddExtra")
         self.actionBuild_Spectrum = QtWidgets.QAction(MainWindow)
+        self.actionBuild_Spectrum.setEnabled(False)
         self.actionBuild_Spectrum.setObjectName("actionBuild_Spectrum")
         self.menuFile.addAction(self.actionCalibration)
         self.menuFile.addAction(self.actionAddExtra)
@@ -182,6 +183,15 @@ class Ui_MainWindow(object):
         self.retranslateUi(MainWindow)
         self.actionQuit.triggered.connect(MainWindow.close) # type: ignore
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
+        MainWindow.setTabOrder(self.reqMassEdit, self.reqNRevsBox)
+        MainWindow.setTabOrder(self.reqNRevsBox, self.centerCavityBox)
+        MainWindow.setTabOrder(self.centerCavityBox, self.isepTrappingBox)
+        MainWindow.setTabOrder(self.isepTrappingBox, self.totalTofBox)
+        MainWindow.setTabOrder(self.totalTofBox, self.mcsDelayBox)
+        MainWindow.setTabOrder(self.mcsDelayBox, self.tableShowButton)
+        MainWindow.setTabOrder(self.tableShowButton, self.showSpectrum)
+        MainWindow.setTabOrder(self.showSpectrum, self.Table)
+        MainWindow.setTabOrder(self.Table, self.checkTofBox)
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate

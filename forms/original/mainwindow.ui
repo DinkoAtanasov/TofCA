@@ -389,6 +389,9 @@
    </property>
   </action>
   <action name="actionBuild_Spectrum">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string>Build Spectrum</string>
    </property>
@@ -397,6 +400,18 @@
    </property>
   </action>
  </widget>
+ <tabstops>
+  <tabstop>reqMassEdit</tabstop>
+  <tabstop>reqNRevsBox</tabstop>
+  <tabstop>centerCavityBox</tabstop>
+  <tabstop>isepTrappingBox</tabstop>
+  <tabstop>totalTofBox</tabstop>
+  <tabstop>mcsDelayBox</tabstop>
+  <tabstop>tableShowButton</tabstop>
+  <tabstop>showSpectrum</tabstop>
+  <tabstop>Table</tabstop>
+  <tabstop>checkTofBox</tabstop>
+ </tabstops>
  <resources/>
  <connections>
   <connection>
