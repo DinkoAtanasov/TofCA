@@ -18,7 +18,9 @@ pg.setConfigOption('foreground', 'k')
 
 
 class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
-    # extras_ready = QtCore.pyqtSignal(object, name='newExtras')
+    """
+    Class to handle plotting of spectra. Displays where new isobars would appear.
+    """
 
     def __init__(self):
         QtWidgets.QDialog.__init__(self)

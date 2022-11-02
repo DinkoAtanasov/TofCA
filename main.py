@@ -64,6 +64,9 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
         self.reqNRevsBox.valueChanged.connect(self.on_user_change)
         self.checkTofBox.valueChanged.connect(self.check_tof)
         self.showSpectrum.toggled.connect(self.react_to_toggle)
+        #
+        self.plt.tofBins.valueChanged.connect(self.on_user_change)
+        self.plt.tofBinWidth.valueChanged.connect(self.on_user_change)
     
     ############################################################################
     # Methods related to Time of flight calculations
@@ -87,13 +90,16 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
         b1 = self.calibration.b2
         ncal = float(self.calibration.revs_n)
         nrevs = float(self.reqNRevsBox.value())
+        binwidth = self.plt.tofBinWidth.value()
+        bins = self.plt.tofBins.value()
+        half_window = (binwidth * bins) / 2  # AcqDelay for minimum half the Tof Range in ns
 
         dframe['Center'] = (a0 * np.sqrt(dframe['m/q']) + b0) * DIST_BUNCHER_TO_CAVITY
         dframe['MagneTof'] = (a0 * np.sqrt(dframe['m/q']) + b0) * (1-DIST_BUNCHER_TO_CAVITY)
         dframe['ISEPtrap'] = (nrevs/ncal) * (a1 * np.sqrt(dframe['m/q']) + b1 - dframe['Center'] - dframe['MagneTof'])   # trapping time in the MR-ToF-ms for n number of revs
         dframe['ToF'] = dframe['ISEPtrap'] + dframe['Center'] + dframe['MagneTof']
         dframe['RevTime'] = dframe['ISEPtrap'] / nrevs
-        dframe['DAQ delay'] = round(dframe['ToF'] - 10) * 1000  # AcqDelay for minimum 10 us before the ToF window
+        dframe['DAQ delay'] = round(dframe['ToF']*1000 - half_window)
         dframe['Check'] = dframe['ToF'] - self.checkTofBox.value()
 
     def delta_tof(self) -> None:
@@ -110,7 +116,7 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
     def check_tof(self) -> None:
         """Add values for Delta ToFs wrt the CheckToF value set in the GUI."""
         df = self.isobars
-        df['check_tof'] = df['ToF'] * 1e3 - self.checkTofBox.value()
+        df['Check'] = df['ToF'] * 1e3 - self.checkTofBox.value()
         for i in range(len(df)):
             self.Table.setItem(i, 12, QtWidgets.QTableWidgetItem(f'{df.at[i, "Check"]:.3f}'))
         self.highlight_tofs(self.idx)
