@@ -41,9 +41,10 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         self.spectrum = None
         self.pg_raw_item = None
         self.raw_tof = pd.DataFrame()
-        self.mca_start = 0
-        self.mca_stop = None
-        self.new_mca_stop()
+        self.mca_start = -10_000
+        self.mca_stop = 10_000
+        self.tof_center = 0
+        # self.new_mca_stop()
 
         self.tofs_table = pd.DataFrame()
         self.tof_widget = pg.PlotWidget()
@@ -52,49 +53,57 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         self.cancelButton.clicked.connect(self.reject)
         self.loadButton.clicked.connect(self.load)
         self.tofShiftBox.valueChanged.connect(self.shift_tof)
+        self.tofBins.valueChanged.connect(self.new_mca_start)
+        self.tofBinWidth.valueChanged.connect(self.new_mca_start)
 
         self.ini_display()
     
     def ini_display(self):
 
         self.spectrum = self.tof_widget.getPlotItem()
+        self.spectrum.setLabels(title='Identification plot', left='Counts', bottom='time (ns)')
         self.font = self.spectrum.getAxis('bottom').label.font()
-        self.font.setPointSize(28)
+        self.font.setPointSize(24)
         self.spectrum.getAxis('bottom').label.setFont(self.font)
         self.spectrum.getAxis('left').label.setFont(self.font)
         self.font.setPointSize(22)
         self.spectrum.getAxis('bottom').setStyle(tickFont=self.font)
         self.spectrum.getAxis('left').setStyle(tickFont=self.font)
-        self.font.setPointSize(30)
-        self.spectrum.getAxis('top').label.setFont(self.font)
-        self.spectrum.setLabels(title='Identification plot', left='Counts', bottom='time (ns)')
+        # self.font.setPointSize(22)
+        # self.spectrum.getAxis('top').label.setFont(self.font)
         self.spectrum.addLegend()
         self.graphWidget.layout().addWidget(self.tof_widget)
 
     def new_plot_title(self, amass, sym, revs):
-        self.spectrum.setLabels(title=f'Identification plot {amass}{sym} {revs}', 
-                                left='Counts', bottom='time (ns)')
+        self.spectrum.setLabels(title=f'Identification plot {amass}{sym} @{revs}revs',
+                                left='Counts', bottom=f'tof - {self.tof_center*1e3:.1f} (ns)')
 
     def new_table_indent(self, df):
         self.tofs_table = df
         self.tofs_table['tof_copy'] = self.tofs_table['ToF']
+        self.tofs_table['Deltas_copy'] = self.tofs_table['Deltas']
 
     def new_mca_stop(self):
-        self.mca_stop = self.mca_start + self.tofBins.value() * self.tofBinWidth.value()
+        # self.mca_stop = self.mca_start + self.tofBins.value() * self.tofBinWidth.value()
+        self.mca_stop = 0.5 * self.tofBins.value() * self.tofBinWidth.value()
+        self.set_limits()
 
     def new_mca_start(self, val):
-        self.mca_start = val
+        # self.mca_start = val - self.tof_center
+        self.mca_stop = -0.5 * self.tofBins.value() * self.tofBinWidth.value()
         self.new_mca_stop()
 
     def show_tofs(self):
         if len(self.tofs_table) == 0:
             return
         for i in range(len(self.tofs_table)):
-            pos = self.tofs_table.at[i, 'ToF'] * 1e3  # convert from micro second to nano second
+            # pos = self.tofs_table.at[i, 'ToF'] * 1e3  # convert from micro second to nano second
+            pos = self.tofs_table.at[i, 'Deltas'] * 1e3  # convert from micro second to nano second
             sym = self.tofs_table.at[i, 'EL']
             icolor = self.tofs_table.at[i, 'Comment']
             self.add_line(pos, sym, icolor)
         if self.raw_exist:
+            self.raw_tof['Deltas'] = self.raw_tof['tof [ns]'] - self.tof_center * 1e3
             self.add_raw_tof()
         self.set_limits()
 
@@ -111,18 +120,20 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         """
         Add infinite line with attached label at the location of a given tof.
 
+        :param icolor:
         :param xpos: ToF position of the line
         :param sym: element symbol
         """
         color = self.color_identity[icolor]
         v_line = pg.InfiniteLine(pos=xpos, angle=90, label=sym, movable=False, 
-                                 labelOpts={'movable':True, 'rotateAxis':(1, 0)},
+                                 labelOpts={'movable': True, 'rotateAxis': (1, 0)},
                                  pen=pg.mkPen(color, width=2), name=sym)
         self.spectrum.addItem(v_line, ignoreBounds=True)
 
     def shift_tof(self):
         a = self.tofShiftBox.value()
-        self.tofs_table['ToF'] = self.tofs_table['tof_copy'] + (a * 0.001)
+        # self.tofs_table['ToF'] = self.tofs_table['tof_copy'] + (a * 0.001)
+        self.tofs_table['Deltas'] = self.tofs_table['Deltas_copy'] + (a * 0.001)
         self.clear_previous()
         self.show_tofs()
 
@@ -136,6 +147,7 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         reader = self.data_factory.get_data_reader(file_selector)
         # Read the Raw Data and extract subset of parameters
         self.raw_tof = reader.process(name)
+        self.raw_tof['Deltas'] = self.raw_tof['tof [ns]'] - self.tof_center * 1e3
         self.run = name.split('/')[-1]
         self.raw_exist = True
         self.add_raw_tof()
@@ -144,10 +156,11 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         # if self.raw_exist:
         #     self.pg_raw_item.setData(x=self.raw_tof['tof [ns]'], y=self.raw_tof['counts'], name=self.run)
         # else:
-        self.pg_raw_item = self.spectrum.plot(x=self.raw_tof['tof [ns]'],
+        # self.pg_raw_item = self.spectrum.plot(x=self.raw_tof['tof [ns]'],
+        self.pg_raw_item = self.spectrum.plot(x=self.raw_tof['Deltas'].values.tolist()+[self.mca_stop+self.tofBinWidth.value()],
                                               y=self.raw_tof['counts'],
                                               pen=pg.mkPen('b', width=2),
-                                              # stepMode='center',
+                                              stepMode='center',
                                               name=self.run)
             # self.raw_exist = True
         self.set_limits()

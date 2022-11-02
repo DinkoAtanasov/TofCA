@@ -58,6 +58,8 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
         # connect signals
         self.actionCalibration.triggered.connect(self.calibration.show)
         self.actionAddExtra.triggered.connect(self.add_extras.show)
+        self.actionQuit.triggered.connect(self.plt.close)
+        self.actionQuit.triggered.connect(self.calibration.close)
         self.add_extras.extras_ready.connect(self.extra_selection)
         self.tableShowButton.clicked.connect(self.new_mass)
         self.reqMassEdit.editingFinished.connect(self.element_modified)
@@ -93,13 +95,14 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
         binwidth = self.plt.tofBinWidth.value()
         bins = self.plt.tofBins.value()
         half_window = (binwidth * bins) / 2  # AcqDelay for minimum half the Tof Range in ns
+        # self.plt.mca_start = -half_window
 
         dframe['Center'] = (a0 * np.sqrt(dframe['m/q']) + b0) * DIST_BUNCHER_TO_CAVITY
         dframe['MagneTof'] = (a0 * np.sqrt(dframe['m/q']) + b0) * (1-DIST_BUNCHER_TO_CAVITY)
         dframe['ISEPtrap'] = (nrevs/ncal) * (a1 * np.sqrt(dframe['m/q']) + b1 - dframe['Center'] - dframe['MagneTof'])   # trapping time in the MR-ToF-ms for n number of revs
         dframe['ToF'] = dframe['ISEPtrap'] + dframe['Center'] + dframe['MagneTof']
         dframe['RevTime'] = dframe['ISEPtrap'] / nrevs
-        dframe['DAQ delay'] = round(dframe['ToF']*1000 - half_window)
+        dframe['DAQ delay'] = round(dframe['ToF']*1e3 - half_window)
         dframe['Check'] = dframe['ToF'] - self.checkTofBox.value()
 
     def delta_tof(self) -> None:
@@ -112,6 +115,7 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
         self.idx = df[(df['EL'] == sym) & (df['A'] == anum)]['ToF'].index.to_list()[0]
         itof = df[(df['EL'] == sym) & (df['A'] == anum)]['ToF'].values[0]
         df['Deltas'] = df['ToF'] - itof
+        self.plt.tof_center = itof
 
     def check_tof(self) -> None:
         """Add values for Delta ToFs wrt the CheckToF value set in the GUI."""
@@ -191,7 +195,7 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
     def identify_elements(self, el_id: str, dframe) -> None:
         dframe['Comment'] = np.full_like(dframe['A'].to_numpy(), self.idn[el_id], dtype=int)
 
-    def non_matching_labels(self, extra_frame: pd.DataFrame)-> pd.DataFrame:
+    def non_matching_labels(self, extra_frame: pd.DataFrame) -> pd.DataFrame:
         """Check for existing isobars or molecules in AME"""
         alist = list(self.isobars['EL'].values)
         blist = list(extra_frame['EL'].values)
@@ -282,7 +286,7 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
         self.isepTrappingBox.setValue(df.at[index, 'ISEPtrap'])
         self.totalTofBox.setValue(df.at[index, 'ToF'])
         self.mcsDelayBox.setValue(df.at[index, 'DAQ delay'])
-        self.plt.new_mca_start(df.at[index, 'DAQ delay'])
+        # self.plt.new_mca_start(df.at[index, 'DAQ delay'])
 
     def keyPressEvent(self, event):
         """Overload the Qt keyPressEvent with action to delete row(s) from the QTableWidget."""
