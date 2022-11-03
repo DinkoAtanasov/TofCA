@@ -35,8 +35,8 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
 
         self.color_identity = {0: 'k', 1: 'r', 2: 'c', 3: 'm', 
                                4: 'g', 5: 'b', 6: 'y', 7: 'c', 
-                               8: pg.mkPen(8), 9: pg.mkPen(9), 
-                               10: pg.mkPen(10), 11: pg.mkPen(11), 12: pg.mkPen(12)}
+                               8: pg.mkColor(8), 9: pg.mkColor(9),
+                               10: pg.mkColor(10), 11: pg.mkColor(11), 12: pg.mkColor(12)}
         self.font = None
         self.stats = None
         self.spectrum = None
@@ -60,24 +60,22 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         self.ini_display()
     
     def ini_display(self):
-
+        px = 22
         self.spectrum = self.tof_widget.getPlotItem()
         self.spectrum.setLabels(title='Identification plot', left='Counts', bottom='time (ns)')
         self.font = self.spectrum.getAxis('bottom').label.font()
-        self.font.setPointSize(24)
+        self.font.setPointSize(px)
         self.spectrum.getAxis('bottom').label.setFont(self.font)
         self.spectrum.getAxis('left').label.setFont(self.font)
-        self.font.setPointSize(22)
+        self.font.setPointSize(px-4)
         self.spectrum.getAxis('bottom').setStyle(tickFont=self.font)
         self.spectrum.getAxis('left').setStyle(tickFont=self.font)
-        # self.font.setPointSize(22)
-        # self.spectrum.getAxis('top').label.setFont(self.font)
         self.spectrum.addLegend()
         self.graphWidget.layout().addWidget(self.tof_widget)
 
     def new_plot_title(self, amass, sym, revs):
-        self.spectrum.setLabels(title=f'Identification plot {amass}{sym} @{revs}revs',
-                                left='Counts', bottom=f'tof - {self.tof_center*1e3:.1f} (ns)')
+        self.spectrum.setTitle(title=f'Identification plot {amass}{sym} @{revs}revs', size='24pt')
+        self.spectrum.setLabels(left='Counts', bottom=f'tof - {self.tof_center*1e3:.1f} (ns)')
 
     def new_table_indent(self, df):
         self.tofs_table = df
@@ -91,7 +89,7 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
 
     def new_mca_start(self, val):
         # self.mca_start = val - self.tof_center
-        self.mca_stop = -0.5 * self.tofBins.value() * self.tofBinWidth.value()
+        self.mca_start = -0.5 * self.tofBins.value() * self.tofBinWidth.value()
         self.new_mca_stop()
 
     def show_tofs(self):
@@ -108,13 +106,14 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
             self.add_raw_tof()
         self.set_limits()
 
-    def set_limits(self):
+    def set_limits(self) -> None:
+        """Update plot range"""
         self.spectrum.setXRange(self.mca_start, self.mca_stop)
 
     def my_accept(self) -> None:
         self.accept()
 
-    def clear_previous(self):
+    def clear_previous(self) -> None:
         self.spectrum.clear()
 
     def add_line(self, xpos: float, sym: str, icolor: int) -> None:
@@ -126,8 +125,9 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         :param sym: element symbol
         """
         color = self.color_identity[icolor]
-        v_line = pg.InfiniteLine(pos=xpos, angle=90, pen=pg.mkPen(color, width=2), name=sym)
-        txt_vline = pg.InfLineLabel(v_line, text=sym, movable=True, rotateAxis=(1, 0))
+        v_line = pg.InfiniteLine(pos=xpos, angle=90, pen=pg.mkPen(color, width=3), name=sym)
+        txt_vline = pg.InfLineLabel(v_line, text=sym, movable=True, rotateAxis=(1, 0), color=color)
+        self.font.setPointSize(20)
         txt_vline.setFont(self.font)
         self.spectrum.addItem(v_line, ignoreBounds=True)
 
