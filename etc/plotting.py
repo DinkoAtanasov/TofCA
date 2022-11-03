@@ -5,6 +5,7 @@ import sys
 
 from typing import List
 from etc.data_reader import DataReader
+from etc.constants import FILE_EXTENSION
 
 import pandas as pd
 
@@ -140,8 +141,7 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
     def load(self):
         dlg = QtWidgets.QFileDialog()
         dlg.setOptions(QtWidgets.QFileDialog.DontUseNativeDialog)
-        my_filter = 'CSV (*.csv);; MPANT (*.mpa);; MCDWIN (*.887);; JYFL (*.txt) '
-        name, file_selector = dlg.getOpenFileName(None, 'Open Raw ToF File', os.getcwd(), my_filter)
+        name, file_selector = dlg.getOpenFileName(None, 'Open Raw ToF File', os.getcwd(), FILE_EXTENSION)
         file_selector = file_selector.split('(')[0].strip().lower()
         # Get the appropriate data reader
         reader = self.data_factory.get_data_reader(file_selector)
@@ -152,17 +152,17 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         self.raw_exist = True
         self.add_raw_tof()
 
-    def add_raw_tof(self):
-        # if self.raw_exist:
-        #     self.pg_raw_item.setData(x=self.raw_tof['tof [ns]'], y=self.raw_tof['counts'], name=self.run)
-        # else:
-        # self.pg_raw_item = self.spectrum.plot(x=self.raw_tof['tof [ns]'],
-        self.pg_raw_item = self.spectrum.plot(x=self.raw_tof['Deltas'].values.tolist()+[self.mca_stop+self.tofBinWidth.value()],
+    def add_raw_tof(self) -> None:
+        """
+        Adds the TOF spectrum to the plot.
+        :return:
+        """
+        tofs = self.raw_tof['Deltas'].values.tolist() + [self.mca_stop+self.tofBinWidth.value()]
+        self.pg_raw_item = self.spectrum.plot(x=tofs,
                                               y=self.raw_tof['counts'],
                                               pen=pg.mkPen('b', width=2),
                                               stepMode='center',
                                               name=self.run)
-            # self.raw_exist = True
         self.set_limits()
 
 
