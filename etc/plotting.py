@@ -126,9 +126,9 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         :param sym: element symbol
         """
         color = self.color_identity[icolor]
-        v_line = pg.InfiniteLine(pos=xpos, angle=90, label=sym, movable=False, 
-                                 labelOpts={'movable': True, 'rotateAxis': (1, 0)},
-                                 pen=pg.mkPen(color, width=2), name=sym)
+        v_line = pg.InfiniteLine(pos=xpos, angle=90, pen=pg.mkPen(color, width=2), name=sym)
+        txt_vline = pg.InfLineLabel(v_line, text=sym, movable=True, rotateAxis=(1, 0))
+        txt_vline.setFont(self.font)
         self.spectrum.addItem(v_line, ignoreBounds=True)
 
     def shift_tof(self):
