@@ -120,6 +120,7 @@ class Ame:
         # df = df.drop(columns=['cc', 'NZ', 'o', 'ME', 'MEunc', 'BE / keV', 'BEunc / keV',
         df = df.drop(columns=['cc', 'NZ', 'o', 'BE / keV', 'BEunc / keV',
                               'B', 'BDE / keV', 'BDE unc / keV', 'am(int)', 'am(rest)'])
+        df['MinMass'] = df.groupby('A')['ame_tot'].transform(lambda x: x == x.min())
         return df
 
     def add_charge_col(self):
@@ -137,8 +138,7 @@ class Ame:
         el, amass, amunc, a, z, n, q = self.get_ame_mass(expr)
         mexcess, meunc = self.mass_excess(amass, amunc, a)
         new_entry = pd.DataFrame([[n, z, a, expr, mexcess, meunc, amass, amunc, q]],
-                                 columns=['N', 'Z', 'A', 'EL', 'ME', 
-                                          'MEunc', 'BE / keV', 
+                                 columns=['N', 'Z', 'A', 'EL', 'ME', 'MEunc',
                                           'ame_tot', 'amunc', 'charge'])
         self.df = pd.concat([self.df, new_entry], sort=False, ignore_index=True)
 

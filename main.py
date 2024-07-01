@@ -99,7 +99,7 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
 
         dframe['Center'] = (a0 * np.sqrt(dframe['m/q']) + b0) * DIST_BUNCHER_TO_CAVITY
         dframe['MagneTof'] = (a0 * np.sqrt(dframe['m/q']) + b0) * (1-DIST_BUNCHER_TO_CAVITY)
-        dframe['ISEPtrap'] = (nrevs/ncal) * (a1 * np.sqrt(dframe['m/q']) + b1 - dframe['Center'] - dframe['MagneTof'])   # trapping time in the MR-ToF-ms for n number of revs
+        dframe['ISEPtrap'] = (nrevs/ncal) * (a1 * np.sqrt(dframe['m/q']) + b1 - dframe['Center'] - dframe['MagneTof'])  # trapping time in the MR-ToF-ms for n number of revs
         dframe['ToF'] = dframe['ISEPtrap'] + dframe['Center'] + dframe['MagneTof']
         dframe['RevTime'] = dframe['ISEPtrap'] / nrevs
         dframe['DAQ delay'] = round(dframe['ToF']*1e3 - half_window)
@@ -178,6 +178,10 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
                 ex_erg = ex_erg.strip('?')
             print(expr, float(ex_erg))
             extras = self.ame.calc_isomer_mass(expr, float(ex_erg))
+        elif who == 'mass-range':
+            vmin, vmax = label.split('-')
+            extras = self.ame_query_range('A', int(vmin), int(vmax), ('MinMass', True))
+            print(extras)
         else:
             expr, a2 = label.split(';')
             aeff = int(self.a) - int(a2)
@@ -207,7 +211,13 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
 
     def ame_query(self, name: str, val: Any) -> pd.DataFrame:
         return self.ame.df[self.ame.df[name] == val].copy().reset_index()
-    
+
+    def ame_query_range(self, name: str, val_min: Any, val_max: Any, ext_cond: tuple) -> pd.DataFrame:
+        cond1 = self.ame.df[name] > val_min
+        cond2 = self.ame.df[name] < val_max
+        cond3 = self.ame.df[ext_cond[0]] == ext_cond[1]
+        return self.ame.df[cond1 & cond2 & cond3].copy().reset_index()
+
     ############################################################################
     # Methods related to GUI interaction/visualisation
     ############################################################################

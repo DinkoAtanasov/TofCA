@@ -104,9 +104,11 @@ class IsepCalibration(QtWidgets.QDialog, QtCore.QObject, ui.Ui_CalibIsep):
             return
         self.a1 = (self.tof1 - self.tof2) / (np.sqrt(self.mass1) - np.sqrt(self.mass2))
         self.b1 = self.tof1 - self.a1 * np.sqrt(self.mass1)
+        # self.b1 = 0.5*(self.tof1 + self.tof2 - self.a1 * (np.sqrt(self.mass1) + np.sqrt(self.mass2)))
         # b1 = self.tof2 - self.a1 * np.sqrt(self.mass2)
 
         self.a2 = (self.tof3 - self.tof4) / (np.sqrt(self.mass1) - np.sqrt(self.mass2))
+        # self.b2 = 0.5 * (self.tof3 + self.tof4 - self.a2 * (np.sqrt(self.mass1) + np.sqrt(self.mass2)))
         self.b2 = self.tof3 - self.a2*np.sqrt(self.mass1)
 
         self.a1CalibEdit.setText(f'{self.a1:.5f}')

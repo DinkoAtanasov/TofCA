@@ -18,7 +18,8 @@ class AddExtra(QtWidgets.QDialog, ui.Ui_add_dlg):
              'chlorides-35': ':1Cl35;35',
              'chlorides-37': ':1Cl37;37',
              'nitrite-14': ':1N14;14', 
-             'nitrite-15': ':1N15;15', 
+             'nitrite-15': ':1N15;15',
+             'mass-range': 'XA-YA',
              'custom': ''
              }
 
