@@ -280,8 +280,8 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
         self.plt.new_table_indent(self.isobars)
         self.plt.new_plot_title(self.a, self.el, self.reqNRevsBox.value())
         self.plt.clear_previous()
-        self.plt.shift_tof()
-        # self.plt.show_tofs()
+        # self.plt.shift_tof()
+        self.plt.show_tofs()
 
     def highlight_tofs(self, row) -> None:
         """highlight the row with Requested mass"""
@@ -296,7 +296,7 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
         self.isepTrappingBox.setValue(df.at[index, 'ISEPtrap'])
         self.totalTofBox.setValue(df.at[index, 'ToF'])
         self.mcsDelayBox.setValue(df.at[index, 'DAQ delay'])
-        # self.plt.new_mca_start(df.at[index, 'DAQ delay'])
+        self.plt.new_mca_start(df.at[index, 'DAQ delay'])
 
     def keyPressEvent(self, event):
         """Overload the Qt keyPressEvent with action to delete row(s) from the QTableWidget."""
