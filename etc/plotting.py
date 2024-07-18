@@ -40,7 +40,8 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         self.color_identity = {0: 'k', 1: 'r', 2: 'c', 3: 'm', 
                                4: 'g', 5: 'b', 6: 'y', 7: 'c', 
                                8: pg.mkColor(8), 9: pg.mkColor(9),
-                               10: pg.mkColor(10), 11: pg.mkColor(11), 12: pg.mkColor(12)}
+                               10: pg.mkColor(10), 11: pg.mkColor(11),
+                               12: pg.mkColor(12), 13: pg.mkColor(13)}
         self.font = None
         self.stats = None
         self.spectrum = None
@@ -116,8 +117,8 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
 
         :param pitem: pyqtgraph.PlotItem contained in the QSubMdiWindow
         """
-
-        lines = [line for line in pitem.items if isinstance(line, pg.InfiniteLine) and (line.name() == 'XXX' or line.name() == 'YYY')]
+        cr_names = ['XXX', 'YYY']
+        lines = [line for line in pitem.items if isinstance(line, pg.InfiniteLine) and (line.name() in cr_names)]
         for line in lines:
             pitem.removeItem(line)
         pitem.scene().sigMouseMoved.disconnect(self.mouseMoved)
@@ -129,8 +130,9 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
 
         :param pos: the current position of the mouse point, which is in local coordinates
         """
+        cr_names = ['XXX', 'YYY']
         pitem = self.sender().parent().getPlotItem()
-        lines = [ln for ln in pitem.items if isinstance(ln, pg.InfiniteLine) and (ln.name() == 'XXX' or ln.name() == 'YYY')]
+        lines = [ln for ln in pitem.items if isinstance(ln, pg.InfiniteLine) and (ln.name() in cr_names)]
         if pitem.sceneBoundingRect().contains(pos):
             mousePoint = pitem.vb.mapSceneToView(pos)
             lines[0].setPos(mousePoint.x())
@@ -183,9 +185,9 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         self.spectrum.setLabels(left='Counts', bottom=f'tof (ns)')
 
     def new_table_indent(self, df):
-        self.tofs_table = df
-        self.tofs_table['tof_copy'] = self.tofs_table['ToF']
-        self.tofs_table['Deltas_copy'] = self.tofs_table['Deltas']
+        self.tofs_table = df.copy()
+        self.tofs_table['tof_copy'] = self.tofs_table['ToF'].copy()
+        self.tofs_table['Deltas_copy'] = self.tofs_table['Deltas'].copy()
 
     def new_mca_stop(self):
         # self.mca_stop = self.mca_start + self.tofBins.value() * self.tofBinWidth.value()
@@ -213,6 +215,7 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         if self.raw_exist:
             self.raw_tof['Deltas'] = self.raw_tof['tof [ns]'] - self.tof_center * 1e3
             self.add_raw_tof()
+            return
         self.set_limits()
 
     def set_limits(self) -> None:
@@ -229,9 +232,9 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         """
         Add infinite line with attached label at the location of a given tof.
 
-        :param icolor:
         :param xpos: ToF position of the line
         :param sym: element symbol
+        :param icolor: number to select a color from a dict
         """
         color = self.color_identity[icolor]
         v_line = pg.InfiniteLine(pos=xpos, angle=90, pen=pg.mkPen(color, width=3), name=sym)
@@ -240,12 +243,22 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         txt_vline.setFont(self.font)
         self.spectrum.addItem(v_line, ignoreBounds=True)
 
-    def shift_tof(self):
+    def update_tof_location(self) -> None:
+        """ Update the locations of the lines following update of the ToF """
+        pitem = self.tof_widget.getPlotItem()
+        cr_names = ['XXX', 'YYY']
+        lines = [line for line in pitem.items if isinstance(line, pg.InfiniteLine) and (line.name() not in cr_names)]
+        for line in lines:
+            mass, sym = line.name().split('-')
+            tof = self.tofs_table[(self.tofs_table['A'] == int(mass)) & (self.tofs_table['EL'] == sym)]['ToF']
+            line.setPos(tof.to_numpy()[0] * 1e3)
+
+    def shift_tof(self) -> None:
+        """ Adjust the ToF by a User offset """
         a = self.tofShiftBox.value()
         self.tofs_table['ToF'] = self.tofs_table['tof_copy'] + (a * 0.001)
         # self.tofs_table['Deltas'] = self.tofs_table['Deltas_copy'] + (a * 0.001)
-        self.clear_previous()
-        self.show_tofs()
+        self.update_tof_location()
 
     def load(self):
         dlg = QtWidgets.QFileDialog(parent=self)

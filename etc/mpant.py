@@ -48,6 +48,7 @@ class MpantMpa:
 
     def read_asc2d(self, name, fs):
         raw_header, raw_data = fs.split('[DATA]\n')
+        print(raw_data[:10])
         if bool(raw_data) and len(raw_data.split(' ')) >= 9:
             self.parse_header(self.conf[self.version], raw_header)
             caloff = float(self.header['caloff'])

@@ -66,6 +66,8 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
         self.reqNRevsBox.valueChanged.connect(self.on_user_change)
         self.checkTofBox.valueChanged.connect(self.check_tof)
         self.showSpectrum.toggled.connect(self.react_to_toggle)
+        self.round_fact_ppg.valueChanged.connect(self.cavity_rounding)
+        self.round_fact_mcs.valueChanged.connect(self.mcs_rounding)
         #
         self.plt.tofBins.valueChanged.connect(self.on_user_change)
         self.plt.tofBinWidth.valueChanged.connect(self.on_user_change)
@@ -98,12 +100,14 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
         # self.plt.mca_start = -half_window
 
         dframe['Center'] = (a0 * np.sqrt(dframe['m/q']) + b0) * DIST_BUNCHER_TO_CAVITY
-        dframe['MagneTof'] = (a0 * np.sqrt(dframe['m/q']) + b0) * (1-DIST_BUNCHER_TO_CAVITY)
-        dframe['ISEPtrap'] = (nrevs/ncal) * (a1 * np.sqrt(dframe['m/q']) + b1 - dframe['Center'] - dframe['MagneTof'])  # trapping time in the MR-ToF-ms for n number of revs
-        dframe['ToF'] = dframe['ISEPtrap'] + dframe['Center'] + dframe['MagneTof']
+        # dframe['MagneTof'] = (a0 * np.sqrt(dframe['m/q']) + b0) * (1-DIST_BUNCHER_TO_CAVITY)
+        dframe['MagneTof'] = (a0 * np.sqrt(dframe['m/q']) + b0) * DIST_CAVITY_TO_MCP
+        dframe['Offset'] = (a0 * np.sqrt(dframe['m/q']) + b0) * OFFSET
+        dframe['ISEPtrap'] = (nrevs/ncal) * (a1 * np.sqrt(dframe['m/q']) + b1 - dframe['Center'] - dframe['MagneTof'] - dframe['Offset'])  # trapping time in the MR-ToF-ms for n number of revs
+        dframe['ToF'] = dframe['ISEPtrap'] + dframe['Center'] + dframe['MagneTof'] + dframe['Offset']
         dframe['RevTime'] = dframe['ISEPtrap'] / nrevs
-        dframe['DAQ delay'] = round(dframe['ToF']*1e3 - half_window)
-        dframe['Check'] = dframe['ToF'] - self.checkTofBox.value()
+        dframe['DAQ delay'] = dframe['ToF']*1e3 - half_window
+        dframe['Check'] = dframe['ToF']*1e3 - self.checkTofBox.value()
 
     def delta_tof(self) -> None:
         """Add to DataFrame the Delta ToFs of isobars wrt to the requested mass."""
@@ -201,8 +205,8 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
 
     def non_matching_labels(self, extra_frame: pd.DataFrame) -> pd.DataFrame:
         """Check for existing isobars or molecules in AME"""
-        alist = list(self.isobars['EL'].values)
-        blist = list(extra_frame['EL'].values)
+        alist = self.isobars['EL'].to_list()
+        blist = extra_frame['EL'].to_list()
         match = [el for el in blist if el in alist]
         for matched in match:
             index = extra_frame[extra_frame['EL'] == matched].index
@@ -280,8 +284,8 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
         self.plt.new_table_indent(self.isobars)
         self.plt.new_plot_title(self.a, self.el, self.reqNRevsBox.value())
         self.plt.clear_previous()
-        # self.plt.shift_tof()
         self.plt.show_tofs()
+        self.plt.shift_tof()
 
     def highlight_tofs(self, row) -> None:
         """highlight the row with Requested mass"""
@@ -296,11 +300,31 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
         self.isepTrappingBox.setValue(df.at[index, 'ISEPtrap'])
         self.totalTofBox.setValue(df.at[index, 'ToF'])
         self.mcsDelayBox.setValue(df.at[index, 'DAQ delay'])
-        self.plt.new_mca_start(df.at[index, 'DAQ delay'])
+        # self.plt.new_mca_start(df.at[index, 'DAQ delay'])
+        self.set_rounding()
+
+    def set_rounding(self) -> None:
+        self.cavity_rounding(self.round_fact_ppg.value())
+        self.mcs_rounding(self.round_fact_mcs.value())
+
+    def cavity_rounding(self, factor) -> None:
+        cav_center = self.rounding(self.centerCavityBox.value() * 1e3, factor) / 1e3
+        self.roundedCenterCavityBox.setValue(cav_center)
+        cav_trap = self.rounding(self.isepTrappingBox.value() * 1e3, factor) / 1e3
+        self.roundedIsepTrappingBox.setValue(cav_trap)
+
+    def mcs_rounding(self, factor) -> None:
+        mcs_del = self.rounding(self.mcsDelayBox.value() * 10,  factor * 10) / 10
+        self.roundedMcsDelayBox.setValue(mcs_del)
+        self.plt.new_mca_start(mcs_del)
+
+    def rounding(self, value: float, factor: float) -> float:
+        return np.round(value / factor) * factor
 
     def keyPressEvent(self, event):
         """Overload the Qt keyPressEvent with action to delete row(s) from the QTableWidget."""
-        if event.key() == QtCore.Qt.Key_Delete:
+        # if event.key() == QtCore.Qt.Key_Delete:
+        if event.key() == QtCore.Qt.Key_Backspace:
             for index in sorted(self.Table.selectionModel().selectedRows(), reverse=True):
                 row = index.row()
                 isym = self.Table.item(row, col_names['EL']).text()
