@@ -28,6 +28,7 @@ class VboxCustomContextMenu(pg.ViewBox):
     sigLinearFit = QtCore.pyqtSignal(int)
     sigCrossHair = QtCore.pyqtSignal(int)
     sigRngFreeze = QtCore.pyqtSignal(int)
+    sigSettings = QtCore.pyqtSignal(int)
 
     def __init__(self, parent=None, **kwargs) -> None:
         """
@@ -120,3 +121,10 @@ class VboxCustomContextMenu(pg.ViewBox):
         self.rngUpdLoad.setCheckable(True)
         # Add to main menu
         self.menu.addAction(self.rngUpdLoad)
+
+        # Create an action
+        self.settings = QtWidgets.QAction("File Settings", self.menu)
+        self.settings.triggered.connect(self.sigSettings.emit)
+        # self.settings.setCheckable(True)
+        # Add to main menu
+        self.menu.addAction(self.settings)

@@ -26,6 +26,7 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
     """
     Class to handle plotting of spectra. Displays where new isobars would appear.
     """
+    showSettings = QtCore.pyqtSignal(object)
 
     def __init__(self):
         QtWidgets.QDialog.__init__(self)
@@ -71,6 +72,7 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         self.tof_widget.getPlotItem().vb.sigGaussFit.connect(self.gauss_fit_requested)
         self.tof_widget.getPlotItem().vb.sigNoneFit.connect(self.remove_fit)
         self.tof_widget.getPlotItem().vb.sigRngFreeze.connect(self.rng_freeze_requested)
+        self.tof_widget.getPlotItem().vb.sigSettings.connect(self.file_settings_requested)
         self.tofBins.valueChanged.connect(self.new_mca_start)
         self.tofBinWidth.valueChanged.connect(self.new_mca_start)
         self.sliceCheckBox.stateChanged.connect(self.sliced_image_requested)
@@ -92,6 +94,12 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         self.spectrum.addLegend()
         self.graphWidget.layout().addWidget(self.tof_widget)
         self.sliceBox.valueChanged.connect(self.update_sliced_projection)
+
+    def file_settings_requested(self, val: int) -> None:
+        keep = ['realtime', 'totalsum', 'sweeps', 'swpreset', 'cycles', 'sweepmode', 'fstchan', 'cmline0']
+        settings = [f'{key} = {val}' for key, val in self.reader.header.items() if key in keep]
+        pretty_settings = '\n'.join(settings)
+        self.showSettings.emit(str(pretty_settings))
 
     def tof_image_requested(self, val: int) -> None:
         self.is_projected = not self.showImg.isChecked()
