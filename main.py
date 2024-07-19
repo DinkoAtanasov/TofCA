@@ -99,12 +99,15 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
         half_window = (binwidth * bins) / 2  # AcqDelay for minimum half the Tof Range in ns
         # self.plt.mca_start = -half_window
 
-        dframe['Center'] = (a0 * np.sqrt(dframe['m/q']) + b0) * DIST_BUNCHER_TO_CAVITY
-        # dframe['MagneTof'] = (a0 * np.sqrt(dframe['m/q']) + b0) * (1-DIST_BUNCHER_TO_CAVITY)
-        dframe['MagneTof'] = (a0 * np.sqrt(dframe['m/q']) + b0) * DIST_CAVITY_TO_MCP
-        dframe['Offset'] = (a0 * np.sqrt(dframe['m/q']) + b0) * OFFSET
-        dframe['ISEPtrap'] = (nrevs/ncal) * (a1 * np.sqrt(dframe['m/q']) + b1 - dframe['Center'] - dframe['MagneTof'] - dframe['Offset'])  # trapping time in the MR-ToF-ms for n number of revs
-        dframe['ToF'] = dframe['ISEPtrap'] + dframe['Center'] + dframe['MagneTof'] + dframe['Offset']
+        dframe['ShTr'] = a0 * np.sqrt(dframe['m/q']) + b0
+        dframe['Center'] = dframe['ShTr'] * DIST_BUNCHER_TO_CAVITY
+        # dframe['MagneTof'] = dframe['ShTr'] * (1-DIST_BUNCHER_TO_CAVITY)
+        dframe['MagneTof'] = dframe['ShTr'] * DIST_CAVITY_TO_MCP
+        dframe['Offset'] = dframe['ShTr'] * OFFSET
+        dframe['AllFactors'] = dframe['Center'] + dframe['MagneTof'] + dframe['Offset']
+        # trapping time in the MR-ToF-ms for n number of revs
+        dframe['ISEPtrap'] = (nrevs/ncal) * (a1 * np.sqrt(dframe['m/q']) + b1 - dframe['AllFactors'])
+        dframe['ToF'] = dframe['ISEPtrap'] + dframe['AllFactors']
         dframe['RevTime'] = dframe['ISEPtrap'] / nrevs
         dframe['DAQ delay'] = dframe['ToF']*1e3 - half_window
         dframe['Check'] = dframe['ToF']*1e3 - self.checkTofBox.value()
@@ -316,7 +319,8 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
     def mcs_rounding(self, factor) -> None:
         mcs_del = self.rounding(self.mcsDelayBox.value() * 10,  factor * 10) / 10
         self.roundedMcsDelayBox.setValue(mcs_del)
-        self.plt.new_mca_start(mcs_del)
+        if not self.plt.raw_exist:
+            self.plt.acqdelay.setValue(mcs_del)
 
     def rounding(self, value: float, factor: float) -> float:
         return np.round(value / factor) * factor

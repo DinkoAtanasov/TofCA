@@ -48,18 +48,21 @@ class MpantMpa:
 
     def read_asc2d(self, name, fs):
         raw_header, raw_data = fs.split('[DATA]\n')
-        print(raw_data[:10])
         if bool(raw_data) and len(raw_data.split(' ')) >= 9:
             self.parse_header(self.conf[self.version], raw_header)
             caloff = float(self.header['caloff'])
             calfact = float(self.header['calfact'])
             raw = pd.read_csv(StringIO(raw_data), delimiter=' ',
-                              usecols=(0, 2), header=0, names=['tof', 'counts'])
+                              usecols=(0, 1, 2), header=0, names=['tof', 'cycles', 'counts'])
             tmp_tofs, tmp_cnts = [], []
+            raw['tof [ns]'] = caloff + (raw['tof'] - 0.5) * calfact
             for bin, grp in raw.groupby('tof'):
                 tmp_tofs.append(caloff + (int(bin) - 0.5) * calfact)
                 tmp_cnts.append(grp['counts'].sum())
-            return pd.DataFrame({'tof [ns]': tmp_tofs, 'counts': tmp_cnts})
+            xproj = pd.DataFrame({'tof [ns]': tmp_tofs,'cycles': tmp_tofs, 'counts': tmp_cnts})
+
+            return xproj, raw
+            # return raw
 
     def read_ascii(self, name, fs):
         raw_header, raw_data = fs.split('[TDAT0,')

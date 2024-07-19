@@ -10,7 +10,7 @@ from etc.constants import FILE_EXTENSION
 import numpy as np
 import pandas as pd
 
-from PyQt5 import QtWidgets, QtCore
+from PyQt5 import QtWidgets, QtCore, QtGui
 from etc.custom_context_menu import VboxCustomContextMenu as VbCMenu
 import etc.utils as utils
 from forms.converted import ui_plot_dlg as ui
@@ -29,31 +29,39 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
 
     def __init__(self):
         QtWidgets.QDialog.__init__(self)
-        self.raw_exist = False
         self.setupUi(self)
         self.setWindowFlag(QtCore.Qt.WindowMinimizeButtonHint, True)
         self.setWindowFlag(QtCore.Qt.WindowMaximizeButtonHint, True)
 
         self.data_factory = DataReader()
-        self.reader_id = 'csv'
+        self.reader_id = 'mpant'
 
-        self.color_identity = {0: 'k', 1: 'r', 2: 'c', 3: 'm', 
-                               4: 'g', 5: 'b', 6: 'y', 7: 'c', 
+        self.color_identity = {0: 'k', 1: 'r', 2: 'c', 3: 'm',
+                               4: 'g', 5: 'b', 6: 'y', 7: 'c',
                                8: pg.mkColor(8), 9: pg.mkColor(9),
                                10: pg.mkColor(10), 11: pg.mkColor(11),
                                12: pg.mkColor(12), 13: pg.mkColor(13)}
         self.font = None
         self.stats = None
         self.spectrum = None
-        self.pg_raw_item = None
-        self.raw_tof = pd.DataFrame()
+        self.run = 'Data'
+        self.tof_proj = pd.DataFrame()
+        self.tof2d = pd.DataFrame()
         self.mca_start = -10_000
         self.mca_stop = 10_000
         self.tof_center = 0
+        self.raw_exist = False
+        self.is_tof_proj = True
+        self.is_rng_frozen = False
         # self.new_mca_stop()
 
         self.tofs_table = pd.DataFrame()
         self.tof_widget = pg.PlotWidget(viewBox=VbCMenu(defaultPadding=0.1))
+
+        colors = ['w', 'k', 'g', 'r', 'y', 'b']
+        self.xy_cmap = pg.ColorMap(None, colors)
+        print(self.xy_cmap)
+        self.bar = pg.ColorBarItem(colorMap=self.xy_cmap)
 
         self.okButton.clicked.connect(self.my_accept)
         self.cancelButton.clicked.connect(self.reject)
@@ -62,11 +70,13 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         self.tof_widget.getPlotItem().vb.sigCrossHair.connect(self.is_crhr_requested)
         self.tof_widget.getPlotItem().vb.sigGaussFit.connect(self.gauss_fit_requested)
         self.tof_widget.getPlotItem().vb.sigNoneFit.connect(self.remove_fit)
+        self.tof_widget.getPlotItem().vb.sigRngFreeze.connect(self.rng_freeze_requested)
         self.tofBins.valueChanged.connect(self.new_mca_start)
         self.tofBinWidth.valueChanged.connect(self.new_mca_start)
+        self.sliceCheckBox.stateChanged.connect(self.sliced_image_requested)
 
         self.ini_display()
-    
+
     def ini_display(self):
         px = 22
         self.spectrum = self.tof_widget.getPlotItem()
@@ -80,6 +90,18 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         self.spectrum.getAxis('left').setStyle(tickFont=self.font)
         self.spectrum.addLegend()
         self.graphWidget.layout().addWidget(self.tof_widget)
+        self.sliceBox.valueChanged.connect(self.update_sliced_projection)
+
+    def sliced_image_requested(self, val: int) -> None:
+        self.is_tof_proj = not bool(val)
+        self.sliceBox.setEnabled(bool(val))
+        self.add_raw_tof()
+
+    def update_sliced_projection(self, val: int) -> None:
+        self.add_raw_tof()
+
+    def rng_freeze_requested(self, val: int) -> None:
+        self.is_rng_frozen = bool(val)
 
     def is_crhr_requested(self, new_state: bool) -> None:
         """
@@ -192,13 +214,8 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
     def new_mca_stop(self):
         # self.mca_stop = self.mca_start + self.tofBins.value() * self.tofBinWidth.value()
         self.mca_stop = self.acqdelay.value() + self.tofBins.value() * self.tofBinWidth.value()
-        self.set_limits()
 
-    def new_mca_start(self, val):
-        # self.mca_start = val - self.tof_center
-        # self.mca_start = -0.5 * self.tofBins.value() * self.tofBinWidth.value()
-        if not self.raw_exist:
-            self.acqdelay.setValue(val)
+    def new_mca_start(self):
         self.mca_start = self.acqdelay.value() - 0.5 * self.tofBinWidth.value()
         self.new_mca_stop()
 
@@ -212,21 +229,27 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
             sym = self.tofs_table.at[i, 'EL']
             icolor = self.tofs_table.at[i, 'Comment']
             self.add_line(pos, f'{mass}-{sym}', icolor)
-        if self.raw_exist:
-            self.raw_tof['Deltas'] = self.raw_tof['tof [ns]'] - self.tof_center * 1e3
-            self.add_raw_tof()
-            return
-        self.set_limits()
+        if not self.is_rng_frozen:
+            self.set_limits()
 
     def set_limits(self) -> None:
         """Update plot range"""
+        self.new_mca_start()
+        self.new_mca_stop()
         self.spectrum.setXRange(self.mca_start, self.mca_stop)
 
     def my_accept(self) -> None:
         self.accept()
 
     def clear_previous(self) -> None:
-        self.spectrum.clear()
+        pitem = self.tof_widget.getPlotItem()
+        keep_names = ['XXX', 'YYY', 'FitLine', self.run]
+        # cr_names = ['XXX', 'YYY']
+        # lines = [line for line in pitem.items if isinstance(line, pg.InfiniteLine) and (line.name() not in cr_names)]
+        lines = [line for line in pitem.items if line.name() not in keep_names]
+        for ln in lines:
+            pitem.removeItem(ln)
+        # self.spectrum.clear()
 
     def add_line(self, xpos: float, sym: str, icolor: int) -> None:
         """
@@ -266,30 +289,84 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         name, file_selector = dlg.getOpenFileName(None, 'Open Raw ToF File', os.getcwd(), FILE_EXTENSION)
         file_selector = file_selector.split('(')[0].strip().lower()
         # Get the appropriate data reader
-        reader = self.data_factory.get_data_reader(file_selector)
+        self.reader = self.data_factory.get_data_reader(file_selector)
+        reader = self.reader
         # Read the Raw Data and extract subset of parameters
-        self.raw_tof = reader.process(name)
+        self.tof_proj, self.tof2d = reader.process(name)
         self.tofBins.setValue(int(reader.header['range']))
         self.tofBinWidth.setValue(float(reader.header['calfact']))
         self.acqdelay.setValue(float(reader.header['caloff']))
-        self.raw_tof['Deltas'] = self.raw_tof['tof [ns]'] - self.tof_center * 1e3
+        self.sliceBox.setMaximum(int(reader.header['cycles']))
+
+        self.tof_proj['Deltas'] = self.tof_proj['tof [ns]'] - self.tof_center * 1e3
         self.run = name.split('/')[-1]
-        self.raw_exist = True
         self.add_raw_tof()
+        self.sliceCheckBox.setEnabled(True)
 
     def add_raw_tof(self) -> None:
         """
         Adds the TOF spectrum to the plot.
         :return:
         """
-        tofs = self.raw_tof['tof [ns]'].values.tolist() + [self.mca_stop+self.tofBinWidth.value()]
-        self.pg_raw_item = self.spectrum.plot(x=tofs,
-                                              y=self.raw_tof['counts'],
-                                              pen=pg.mkPen('b', width=2),
-                                              stepMode='center',
-                                              name=self.run)
 
-        self.set_limits()
+        if self.raw_exist:
+            self.remove_raw_spectrum()
+
+        if self.is_tof_proj:
+            tofs = self.tof_proj['tof [ns]'].tolist() + [self.mca_stop + self.tofBinWidth.value()]
+            self.spectrum.plot(x=tofs, y=self.tof_proj['counts'].to_numpy(), pen=pg.mkPen('b', width=2),
+                               stepMode='center', name=self.run)
+        else:
+            slice = self.sliceBox.value()
+            sliced = self.tof2d[self.tof2d['cycles'] == slice]
+            tofs = sliced['tof [ns]'].tolist() + [self.mca_stop + self.tofBinWidth.value()]
+            self.spectrum.plot(x=tofs, y=sliced['counts'].to_numpy(), pen=pg.mkPen('b', width=2),
+                               stepMode='center', name=self.run)
+
+        self.raw_exist = True
+        if not self.is_rng_frozen:
+            self.set_limits()
+
+    def add_tof_image(self):
+        header = self.reader.header
+        nbinx = header['range']
+        nbiny = header['cycles']
+
+        bins = np.asarray((nbinx, nbiny)).astype(np.int64)
+        rng = np.asarray(((0, nbinx), (0, nbiny))).astype(np.float64)
+        xyimg = np.zeros((bins[0], bins[1]), dtype=np.float64)
+        hist2d_numba_seq(xyimg,
+                         self.tof2d['tof'].to_numpy().astype(np.float64),
+                         self.tof2d['cycles'].to_numpy().astype(np.float64),
+                         self.tof2d['counts'].to_numpy().astype(np.int64),
+                         bins,
+                         rng)
+        img = pg.ImageItem()
+        img.setImage(self.xyimg)
+        tr_xvsy = QtGui.QTransform()
+        tof_start = self.acqdelay.value() - 0.5 * self.tofBinWidth.value()
+        tr_xvsy.translate(tof_start, 0)
+        tr_xvsy.scale(self.tofBinWidth.value(), 1)
+        img.setTransform(tr_xvsy)
+        self.spectrum.addItem(img)
+        self.bar.setImageItem(img, insert_in=self.spectrum)
+        self.bar.setLevels(low=0, high=10)
+
+    def remove_raw_spectrum(self):
+        pitem = self.tof_widget.getPlotItem()
+        old = [item for item in pitem.items if isinstance(item, pg.PlotDataItem) or isinstance(item, pg.ImageItem)]
+        for spec in old:
+            pitem.removeItem(spec)
+        self.raw_exist = False
+
+
+def hist2d_numba_seq(H, x, y, cnt, bins, ranges):
+    delta = 1 / ((ranges[:, 1] - ranges[:, 0]) / bins)
+    for t in range(x.shape[0]):
+        i = (x[t] - ranges[0, 0]) * delta[0]
+        j = (y[t] - ranges[1, 0]) * delta[1]
+        if 0 <= i < bins[0] and 0 <= j < bins[1]:
+            H[int(i), int(j)] += cnt[t]
 
 
 def main() -> None:

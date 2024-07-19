@@ -27,6 +27,7 @@ class VboxCustomContextMenu(pg.ViewBox):
     sigGaussFit = QtCore.pyqtSignal(int)
     sigLinearFit = QtCore.pyqtSignal(int)
     sigCrossHair = QtCore.pyqtSignal(int)
+    sigRngFreeze = QtCore.pyqtSignal(int)
 
     def __init__(self, parent=None, **kwargs) -> None:
         """
@@ -112,3 +113,10 @@ class VboxCustomContextMenu(pg.ViewBox):
         self.actionCrHr.setCheckable(True)
         # Add to main menu
         self.menu.addAction(self.actionCrHr)
+
+        # Create an action
+        self.rngUpdLoad = QtWidgets.QAction("Range Freeze?", self.menu)
+        self.rngUpdLoad.triggered.connect(self.sigRngFreeze.emit)
+        self.rngUpdLoad.setCheckable(True)
+        # Add to main menu
+        self.menu.addAction(self.rngUpdLoad)
