@@ -51,7 +51,8 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         self.mca_stop = 10_000
         self.tof_center = 0
         self.raw_exist = False
-        self.is_tof_proj = True
+        self.is_projected = not self.showImg.isChecked()
+        self.is_sliced = True
         self.is_rng_frozen = False
         # self.new_mca_stop()
 
@@ -60,7 +61,6 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
 
         colors = ['w', 'k', 'g', 'r', 'y', 'b']
         self.xy_cmap = pg.ColorMap(None, colors)
-        print(self.xy_cmap)
         self.bar = pg.ColorBarItem(colorMap=self.xy_cmap)
 
         self.okButton.clicked.connect(self.my_accept)
@@ -74,6 +74,7 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         self.tofBins.valueChanged.connect(self.new_mca_start)
         self.tofBinWidth.valueChanged.connect(self.new_mca_start)
         self.sliceCheckBox.stateChanged.connect(self.sliced_image_requested)
+        self.showImg.toggled.connect(self.tof_image_requested)
 
         self.ini_display()
 
@@ -92,8 +93,16 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         self.graphWidget.layout().addWidget(self.tof_widget)
         self.sliceBox.valueChanged.connect(self.update_sliced_projection)
 
+    def tof_image_requested(self, val: int) -> None:
+        self.is_projected = not self.showImg.isChecked()
+        if not self.is_projected:
+            self.sliceCheckBox.stateChanged.disconnect(self.sliced_image_requested)
+        else:
+            self.sliceCheckBox.stateChanged.connect(self.sliced_image_requested)
+        self.add_raw_tof()
+
     def sliced_image_requested(self, val: int) -> None:
-        self.is_tof_proj = not bool(val)
+        self.is_sliced = bool(val)
         self.sliceBox.setEnabled(bool(val))
         self.add_raw_tof()
 
@@ -246,10 +255,10 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         keep_names = ['XXX', 'YYY', 'FitLine', self.run]
         # cr_names = ['XXX', 'YYY']
         # lines = [line for line in pitem.items if isinstance(line, pg.InfiniteLine) and (line.name() not in cr_names)]
-        lines = [line for line in pitem.items if line.name() not in keep_names]
+        items = [l for l in pitem.items if not isinstance(l, pg.ImageItem)]
+        lines = [line for line in items if line.name() not in keep_names]
         for ln in lines:
             pitem.removeItem(ln)
-        # self.spectrum.clear()
 
     def add_line(self, xpos: float, sym: str, icolor: int) -> None:
         """
@@ -312,17 +321,19 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         if self.raw_exist:
             self.remove_raw_spectrum()
 
-        if self.is_tof_proj:
-            tofs = self.tof_proj['tof [ns]'].tolist() + [self.mca_stop + self.tofBinWidth.value()]
-            self.spectrum.plot(x=tofs, y=self.tof_proj['counts'].to_numpy(), pen=pg.mkPen('b', width=2),
-                               stepMode='center', name=self.run)
+        if self.is_projected:
+            if self.is_sliced:
+                slice = self.sliceBox.value()
+                sliced = self.tof2d[self.tof2d['cycles'] == slice]
+                tofs = sliced['tof [ns]'].tolist() + [self.mca_stop + self.tofBinWidth.value()]
+                self.spectrum.plot(x=tofs, y=sliced['counts'].to_numpy(), pen=pg.mkPen('b', width=2),
+                                   stepMode='center', name=self.run)
+            else:
+                tofs = self.tof_proj['tof [ns]'].tolist() + [self.mca_stop + self.tofBinWidth.value()]
+                self.spectrum.plot(x=tofs, y=self.tof_proj['counts'].to_numpy(), pen=pg.mkPen('b', width=2),
+                                   stepMode='center', name=self.run)
         else:
-            slice = self.sliceBox.value()
-            sliced = self.tof2d[self.tof2d['cycles'] == slice]
-            tofs = sliced['tof [ns]'].tolist() + [self.mca_stop + self.tofBinWidth.value()]
-            self.spectrum.plot(x=tofs, y=sliced['counts'].to_numpy(), pen=pg.mkPen('b', width=2),
-                               stepMode='center', name=self.run)
-
+            self.add_tof_image()
         self.raw_exist = True
         if not self.is_rng_frozen:
             self.set_limits()
@@ -342,7 +353,7 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
                          bins,
                          rng)
         img = pg.ImageItem()
-        img.setImage(self.xyimg)
+        img.setImage(xyimg)
         tr_xvsy = QtGui.QTransform()
         tof_start = self.acqdelay.value() - 0.5 * self.tofBinWidth.value()
         tr_xvsy.translate(tof_start, 0)
@@ -350,7 +361,7 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         img.setTransform(tr_xvsy)
         self.spectrum.addItem(img)
         self.bar.setImageItem(img, insert_in=self.spectrum)
-        self.bar.setLevels(low=0, high=10)
+        self.bar.setLevels(low=0, high=self.tof2d['counts'].max())
 
     def remove_raw_spectrum(self):
         pitem = self.tof_widget.getPlotItem()
