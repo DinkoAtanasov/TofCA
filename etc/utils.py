@@ -28,6 +28,23 @@ class CfgParser(ConfigParser):
         self.read_dict(d)
 
 
+def fill_hist_nb(H, x, cnt, bins, ranges):
+    delta = 1 / ((ranges[1] - ranges[0]) / bins)
+    for t in range(x.shape[0]):
+        i = (x[t] - ranges[0]) * delta
+        if 0 <= i < bins:
+            H[int(i)] += cnt[t]
+
+
+def hist2d_numba_seq(H, x, y, cnt, bins, ranges):
+    delta = 1 / ((ranges[:, 1] - ranges[:, 0]) / bins)
+    for t in range(x.shape[0]):
+        i = (x[t] - ranges[0, 0]) * delta[0]
+        j = (y[t] - ranges[1, 0]) * delta[1]
+        if 0 <= i < bins[0] and 0 <= j < bins[1]:
+            H[int(i), int(j)] += cnt[t]
+
+
 def str_with_err(value, error):
     if error < 1:
         digits = int(abs(math.floor(math.log10(error))))

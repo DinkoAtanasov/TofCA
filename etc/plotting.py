@@ -26,7 +26,7 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
     """
     Class to handle plotting of spectra. Displays where new isobars would appear.
     """
-    showSettings = QtCore.pyqtSignal(object)
+    newUserMsg = QtCore.pyqtSignal(object)
 
     def __init__(self):
         QtWidgets.QDialog.__init__(self)
@@ -46,14 +46,15 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         self.stats = None
         self.spectrum = None
         self.run = 'Data'
-        self.tof_proj = pd.DataFrame()
-        self.tof2d = pd.DataFrame()
+        self.tof_cnts = None
+        self.tof_edges = None
+        self.tof2d = None
         self.mca_start = -10_000
         self.mca_stop = 10_000
         self.tof_center = 0
         self.raw_exist = False
         self.is_projected = not self.showImg.isChecked()
-        self.is_sliced = True
+        self.is_sliced = False
         self.is_rng_frozen = False
         # self.new_mca_stop()
 
@@ -95,11 +96,18 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         self.graphWidget.layout().addWidget(self.tof_widget)
         self.sliceBox.valueChanged.connect(self.update_sliced_projection)
 
+    def reset_data_containers(self) -> None:
+        self.tof_cnts = None
+        self.tof_edges = None
+        self.tof2d = None
+        self.is_projected = True
+        self.is_sliced = False
+
     def file_settings_requested(self, val: int) -> None:
         keep = ['realtime', 'totalsum', 'sweeps', 'swpreset', 'cycles', 'sweepmode', 'fstchan', 'cmline0']
         settings = [f'{key} = {val}' for key, val in self.reader.header.items() if key in keep]
         pretty_settings = '\n'.join(settings)
-        self.showSettings.emit(str(pretty_settings))
+        self.newUserMsg.emit(str(pretty_settings))
 
     def tof_image_requested(self, val: int) -> None:
         self.is_projected = not self.showImg.isChecked()
@@ -263,7 +271,7 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         keep_names = ['XXX', 'YYY', 'FitLine', self.run]
         # cr_names = ['XXX', 'YYY']
         # lines = [line for line in pitem.items if isinstance(line, pg.InfiniteLine) and (line.name() not in cr_names)]
-        items = [l for l in pitem.items if not isinstance(l, pg.ImageItem)]
+        items = [ln for ln in pitem.items if not isinstance(ln, pg.ImageItem)]
         lines = [line for line in items if line.name() not in keep_names]
         for ln in lines:
             pitem.removeItem(ln)
@@ -304,21 +312,30 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         dlg = QtWidgets.QFileDialog(parent=self)
         dlg.setOptions(QtWidgets.QFileDialog.DontUseNativeDialog)
         name, file_selector = dlg.getOpenFileName(None, 'Open Raw ToF File', os.getcwd(), FILE_EXTENSION)
+        if not name:
+            return
+        self.reset_data_containers()
         file_selector = file_selector.split('(')[0].strip().lower()
         # Get the appropriate data reader
         self.reader = self.data_factory.get_data_reader(file_selector)
         reader = self.reader
         # Read the Raw Data and extract subset of parameters
-        self.tof_proj, self.tof2d = reader.process(name)
+        self.tof_edges, self.tof_cnts, self.tof2d = reader.process(name)
         self.tofBins.setValue(int(reader.header['range']))
         self.tofBinWidth.setValue(float(reader.header['calfact']))
         self.acqdelay.setValue(float(reader.header['caloff']))
-        self.sliceBox.setMaximum(int(reader.header['cycles']))
+        self.sliceBox.setMaximum(int(reader.header['cycles'])-1)
 
-        self.tof_proj['Deltas'] = self.tof_proj['tof [ns]'] - self.tof_center * 1e3
         self.run = name.split('/')[-1]
-        self.add_raw_tof()
-        self.sliceCheckBox.setEnabled(True)
+        if self.tof2d is not None:
+            self.sliceCheckBox.setEnabled(True)
+            self.visBox.setEnabled(True)
+            self.add_raw_tof()
+        else:
+            self.sliceCheckBox.setEnabled(False)
+            self.sliceCheckBox.setChecked(False)
+            self.visBox.setEnabled(False)
+            self.showProj.setChecked(True)
 
     def add_raw_tof(self) -> None:
         """
@@ -332,36 +349,31 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         if self.is_projected:
             if self.is_sliced:
                 slice = self.sliceBox.value()
-                sliced = self.tof2d[self.tof2d['cycles'] == slice]
-                tofs = sliced['tof [ns]'].tolist() + [self.mca_stop + self.tofBinWidth.value()]
-                self.spectrum.plot(x=tofs, y=sliced['counts'].to_numpy(), pen=pg.mkPen('b', width=2),
-                                   stepMode='center', name=self.run)
+                chan = self.tof_edges
+                cnts = self.tof2d[:, slice]
             else:
-                tofs = self.tof_proj['tof [ns]'].tolist() + [self.mca_stop + self.tofBinWidth.value()]
-                self.spectrum.plot(x=tofs, y=self.tof_proj['counts'].to_numpy(), pen=pg.mkPen('b', width=2),
-                                   stepMode='center', name=self.run)
+                chan = self.tof_edges
+                cnts = self.tof_cnts
+
+            self.spectrum.plot(x=chan, y=cnts, pen=pg.mkPen('b', width=2),
+                               stepMode='center', name=self.run)
         else:
             self.add_tof_image()
         self.raw_exist = True
         if not self.is_rng_frozen:
             self.set_limits()
 
-    def add_tof_image(self):
-        header = self.reader.header
-        nbinx = header['range']
-        nbiny = header['cycles']
-
-        bins = np.asarray((nbinx, nbiny)).astype(np.int64)
-        rng = np.asarray(((0, nbinx), (0, nbiny))).astype(np.float64)
-        xyimg = np.zeros((bins[0], bins[1]), dtype=np.float64)
-        hist2d_numba_seq(xyimg,
-                         self.tof2d['tof'].to_numpy().astype(np.float64),
-                         self.tof2d['cycles'].to_numpy().astype(np.float64),
-                         self.tof2d['counts'].to_numpy().astype(np.int64),
-                         bins,
-                         rng)
+    def add_tof_image(self) -> None:
+        """ Display 2D TOF Histogram as PyQtImageItem"""
+        if self.tof2d is None:
+            self.newUserMsg.emit('No 2D data exists!')
+            self.sliceCheckBox.setEnabled(False)
+            self.sliceCheckBox.setChecked(False)
+            self.visBox.setEnabled(False)
+            self.showProj.setChecked(True)
+            return
         img = pg.ImageItem()
-        img.setImage(xyimg)
+        img.setImage(self.tof2d)
         tr_xvsy = QtGui.QTransform()
         tof_start = self.acqdelay.value() - 0.5 * self.tofBinWidth.value()
         tr_xvsy.translate(tof_start, 0)
@@ -369,7 +381,7 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         img.setTransform(tr_xvsy)
         self.spectrum.addItem(img)
         self.bar.setImageItem(img, insert_in=self.spectrum)
-        self.bar.setLevels(low=0, high=self.tof2d['counts'].max())
+        self.bar.setLevels(low=0, high=self.tof2d.max())
 
     def remove_raw_spectrum(self):
         pitem = self.tof_widget.getPlotItem()
@@ -378,14 +390,6 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
             pitem.removeItem(spec)
         self.raw_exist = False
 
-
-def hist2d_numba_seq(H, x, y, cnt, bins, ranges):
-    delta = 1 / ((ranges[:, 1] - ranges[:, 0]) / bins)
-    for t in range(x.shape[0]):
-        i = (x[t] - ranges[0, 0]) * delta[0]
-        j = (y[t] - ranges[1, 0]) * delta[1]
-        if 0 <= i < bins[0] and 0 <= j < bins[1]:
-            H[int(i), int(j)] += cnt[t]
 
 
 def main() -> None:

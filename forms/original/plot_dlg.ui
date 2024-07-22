@@ -215,7 +215,10 @@
     </widget>
    </item>
    <item row="1" column="0">
-    <widget class="QGroupBox" name="groupBox">
+    <widget class="QGroupBox" name="visBox">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
      <property name="font">
       <font>
        <bold>true</bold>

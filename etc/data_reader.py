@@ -10,14 +10,15 @@ class DataReader:
     """
     readers = {
         'mpant': MpantMpa(),
-        'mcdwin': Mcdwin(),
+        # 'mcdwin': Mcdwin(),
         'jyfl': Jyfl(),
         'csv': ReadCsv()
     }
 
     def __init__(self):
-        self.readers = {'mpant': MpantMpa(), 'mcdwin': Mcdwin(), 'jyfl': Jyfl(), 'csv': ReadCsv()}        
-    
+        # self.readers = {'mpant': MpantMpa(), 'mcdwin': Mcdwin(), 'jyfl': Jyfl(), 'csv': ReadCsv()}
+        self.readers = {'mpant': MpantMpa(), 'jyfl': Jyfl(), 'csv': ReadCsv()}
+
     def get_data_reader(self, ident):
         """
         Choose a valid data reader class

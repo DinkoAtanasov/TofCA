@@ -71,7 +71,7 @@ class IsepBrowser(QtWidgets.QMainWindow, QtCore.QObject, ui.Ui_MainWindow):
         #
         self.plt.tofBins.valueChanged.connect(self.on_user_change)
         self.plt.tofBinWidth.valueChanged.connect(self.on_user_change)
-        self.plt.showSettings.connect(self.show_msg)
+        self.plt.newUserMsg.connect(self.show_msg)
     
     ############################################################################
     # Methods related to Time of flight calculations
