@@ -20,15 +20,18 @@ class VboxCustomContextMenu(pg.ViewBox):
     sigNewGaussFit(int)        USER requests a Gauss fit at ViewBox
     sigNewLinearFit(int)       USER requests a Linear fit at ViewBox
     sigCrossHair(int)          USER requests a drawing of Cross-Hairs
+    sigRngFreeze(int)          USER requests the Range to freeze when updates
+    sigSettings(int)           USER requests visualization of data parameters
     =========================  ==============================================
 
     """
-    sigNoneFit = QtCore.pyqtSignal(int)
-    sigGaussFit = QtCore.pyqtSignal(int)
-    sigLinearFit = QtCore.pyqtSignal(int)
-    sigCrossHair = QtCore.pyqtSignal(int)
-    sigRngFreeze = QtCore.pyqtSignal(int)
-    sigSettings = QtCore.pyqtSignal(int)
+    sigNoneFit = QtCore.pyqtSignal(int, name='sigNoneFit')
+    sigGaussFit = QtCore.pyqtSignal(int, name='sigGaussFit')
+    sigLinearFit = QtCore.pyqtSignal(int, name='sigLinearFit')
+    sigCrossHair = QtCore.pyqtSignal(int, name='sigCrossHair')
+    sigRngFreeze = QtCore.pyqtSignal(int, name='sigRngFreeze')
+    sigSettings = QtCore.pyqtSignal(int, name='sigSettings')
+    # sigDeltaTof = QtCore.pyqtSignal(int, name='sigDeltaTof')
 
     def __init__(self, parent=None, **kwargs) -> None:
         """
@@ -128,3 +131,10 @@ class VboxCustomContextMenu(pg.ViewBox):
         # self.settings.setCheckable(True)
         # Add to main menu
         self.menu.addAction(self.settings)
+
+        # # Create an action
+        # self.delta_tof = QtWidgets.QAction("Show Delta to IOI", self.menu)
+        # self.delta_tof.triggered.connect(self.sigDeltaTof.emit)
+        # self.delta_tof.setCheckable(True)
+        # # Add to main menu
+        # self.menu.addAction(self.delta_tof)

@@ -20,7 +20,7 @@ class Jyfl:
 
     def read(self, name):
         """
-        Read mpa data file
+        Read txt data file
         :return:
         """
         self.parse_header(name)

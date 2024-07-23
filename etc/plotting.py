@@ -26,10 +26,10 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
     """
     Class to handle plotting of spectra. Displays where new isobars would appear.
     """
-    newUserMsg = QtCore.pyqtSignal(object)
+    newUserMsg = QtCore.pyqtSignal(object, name='newUserMsg')
 
-    def __init__(self):
-        QtWidgets.QDialog.__init__(self)
+    def __init__(self, parent=None):
+        QtWidgets.QDialog.__init__(self, parent=parent)
         self.setupUi(self)
         self.setWindowFlag(QtCore.Qt.WindowMinimizeButtonHint, True)
         self.setWindowFlag(QtCore.Qt.WindowMaximizeButtonHint, True)
@@ -389,7 +389,6 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         for spec in old:
             pitem.removeItem(spec)
         self.raw_exist = False
-
 
 
 def main() -> None:

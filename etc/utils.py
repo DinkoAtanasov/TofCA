@@ -79,7 +79,7 @@ def stdev_to_fwhm(val: float) -> float:
 
 def gauss(x, Ampl=1, Center=0, Sigma=0.5, Baseline=0) -> float:
     """
-    This is a method from the Pynalyse's class returning a point on a gaussian distribution
+    Method to build a Gaussian distribution
 
     :param x: The variable for Gaussian distribution
     :param Ampl: Amplitude
