@@ -311,8 +311,9 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
     def load(self):
         dlg = QtWidgets.QFileDialog(parent=self)
         dlg.setOptions(QtWidgets.QFileDialog.DontUseNativeDialog)
-        name, file_selector = dlg.getOpenFileName(None, 'Open Raw ToF File', os.getcwd(), FILE_EXTENSION)
-        if not name:
+        # name, file_selector = dlg.getOpenFileName(None, 'Open Raw ToF File', os.getcwd(), FILE_EXTENSION)
+        names, file_selector = dlg.getOpenFileNames(None, 'Open Raw ToF File', os.getcwd(), FILE_EXTENSION)
+        if not names:
             return
         self.reset_data_containers()
         file_selector = file_selector.split('(')[0].strip().lower()
@@ -320,13 +321,13 @@ class PlotBrowser(QtWidgets.QDialog, ui.Ui_PlotDialog):
         self.reader = self.data_factory.get_data_reader(file_selector)
         reader = self.reader
         # Read the Raw Data and extract subset of parameters
-        self.tof_edges, self.tof_cnts, self.tof2d = reader.process(name)
+        self.tof_edges, self.tof_cnts, self.tof2d = reader.process(names)
         self.tofBins.setValue(int(reader.header['range']))
         self.tofBinWidth.setValue(float(reader.header['calfact']))
         self.acqdelay.setValue(float(reader.header['caloff']))
         self.sliceBox.setMaximum(int(reader.header['cycles'])-1)
-
-        self.run = name.split('/')[-1]
+        base_names = [f'{n.split("/")[-1]}' for n in names]
+        self.run = ' '.join(base_names)
         if self.tof2d is not None:
             self.sliceCheckBox.setEnabled(True)
             self.visBox.setEnabled(True)

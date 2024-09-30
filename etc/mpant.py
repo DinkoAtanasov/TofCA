@@ -24,17 +24,22 @@ class MpantMpa:
         self.version = ''
         self.raw = pd.DataFrame()
 
-    def read(self, mpa):
+    def read(self, mpa_list):
         """
         Read mpa data file
         :return:
         """
-        with open(mpa, 'r') as f:
-            fs = f.read()
-            self.version = fs[1:6]
-            name = os.path.basename(mpa).split('.')[0]
-            raw = self.read_asc2d(name, fs)
-            return *self.tof_proj(raw), self.tof_2d(raw)
+        parts = []
+        ends = 0
+        for mpa in mpa_list:
+            with open(mpa, 'r') as f:
+                fs = f.read()
+                self.version = fs[1:6]
+                name = os.path.basename(mpa).split('.')[0]
+                parts.append(self.read_asc2d(name, fs, ends))
+                ends += int(self.header['cycles'])
+        raw = pd.concat(parts, ignore_index=True)
+        return *self.tof_proj(raw), self.tof_2d(raw, ends)
 
     def parse_header(self, key, txt):
         parser = Parser(strict=False)
@@ -43,12 +48,13 @@ class MpantMpa:
         self.header = dict(**tmp['CHN1'])
         self.header.update(**tmp[key])
 
-    def read_asc2d(self, name, fs):
+    def read_asc2d(self, name, fs, end_cycles):
         raw_header, raw_data = fs.split('[DATA]\n')
         if bool(raw_data) and len(raw_data.split(' ')) >= 9:
             self.parse_header(self.conf[self.version], raw_header)
             raw = pd.read_csv(StringIO(raw_data), delimiter=' ',
                               usecols=(0, 1, 2), header=0, names=['tof', 'cycles', 'counts'])
+            raw['cycles'] = raw['cycles'] + end_cycles
             return raw
 
     def read_tdat0(self, name, fs):
@@ -76,9 +82,10 @@ class MpantMpa:
         fill_hist_nb(proj_cnts, raw['tof'], raw['counts'], bins_1d, tof_limits)
         return tof_ns, proj_cnts
 
-    def tof_2d(self, raw):
+    def tof_2d(self, raw, ends):
         mca_bins = int(self.header['range'])
-        cycles_bins = int(self.header['cycles'])
+        # cycles_bins = int(self.header['cycles'])
+        cycles_bins = ends
 
         bins_2d = np.asarray((mca_bins, cycles_bins)).astype(np.int64)
         rng = np.asarray(((0, mca_bins), (0, cycles_bins))).astype(np.float64)
